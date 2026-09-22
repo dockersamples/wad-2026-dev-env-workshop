@@ -1,0 +1,73 @@
+# The full "devcontainers, taken seriously" environment from module 4.
+#
+#   sbx env run     — create it (if needed) and attach to the agent
+#   sbx env plan    — see what it would change outside the sandbox
+#   sbx env rm      — tear it down
+#
+# Needs sbx 0.45.0 or later. `sbx env` and kits are both experimental, so
+# this file's format may still move.
+#
+# Prerequisite, once, on your host:
+#   sbx secret set github --command 'gh auth token'
+#
+# Nothing from your machine is mounted: there's no `workspace:`, so the
+# sandbox is mountless and github-clone brings the repo in from GitHub. Swap
+# `repo:` for your own fork.
+
+schemaVersion: "1"
+name: sessionboard-dev
+agent: claude
+
+kits:
+  # Order matters: clone first so the project kit's `npm ci` has something to
+  # install against.
+  - source: ./kits/github-clone
+    args:
+      repo: dockersamples/wad-2026-dev-env-workshop
+      dir: /home/agent/workspace
+
+  - source: ./kits/sessionboard
+    args:
+      # Where github-clone put the repo, plus the path to the app inside it.
+      dir: /home/agent/workspace/examples/sessionboard
+
+  # VS Code in the browser on :8080, with the Claude Code extension already
+  # installed so it inherits this sandbox's credentials.
+  - docker.io/sbx/code-server-kit:latest
+
+  # Host keys pre-seeded, and commit signing via your host's SSH agent.
+  - docker.io/sbx/github-ssh-kit:latest
+  - docker.io/sbx/git-ssh-sign-kit:latest
+
+# Resolved on the HOST when the proxy needs a value. The token never lands in
+# this file, in your shell history, or inside the VM.
+secrets:
+  github:
+    command: gh auth token
+
+# Which credential mechanisms and domains you've approved. Third-party v2
+# kits (github-clone, here) require an approved binding before the proxy will
+# spend the credential.
+bindings:
+  github:
+    apiKey:
+      domains:
+        - api.github.com
+        - github.com
+
+mcp:
+  servers:
+    - name: context7
+      url: https://mcp.context7.com/mcp
+
+ports:
+  - sandbox: 3000
+    host: 3000
+    protocol: tcp4
+  - sandbox: 8080
+    host: 8080
+    protocol: tcp4
+
+sandboxOptions:
+  cpus: 4
+  memory: 8g

@@ -1,0 +1,213 @@
+version: "2.0"
+
+metadata:
+  id: sbxenv
+  title: "Sharing the environment with sbxenv"
+  summary: "Turn a pile of flags into one committed file, read the plan, and meet the recreate rule."
+
+# Picks up where module 2 left off: the `sessionboard` sandbox exists with the
+# project kit added, and the API's port is published.
+state:
+  sandbox:
+    created: true
+  ports:
+    api: true
+  kit:
+    added: true
+  env:
+    created: false
+
+settings:
+  pace:
+    pull: 700
+    boot: 1100
+    install: 900
+
+defaults:
+  unmatched:
+    stderr:
+      - "That command isn't part of this module. Check the instructions on the left, or use Reset to start over."
+    exit: 127
+
+scenarios:
+  - id: sbx-version
+    when:
+      command: sbx version
+    then:
+      output:
+        - "sbx version: v0.45.0 9f2c41a7b0e5d38c6a1f4b2e7d905c8134ae6b22"
+
+  # `sbx run claude` is only useful in the Agent tab — it attaches you to the
+  # agent and that terminal is then busy for the rest of the lab.
+
+  - id: sbx-rm
+    when:
+      command: sbx rm
+    then:
+      state:
+        sandbox.created: false
+        kit.added: false
+        ports.api: false
+      output:
+        - "Deleting sandbox sessionboard..."
+        - "Sandbox 'sessionboard' removed"
+
+  - id: env-plan
+    completes: plan-env
+    when:
+      command: sbx env plan
+    then:
+      output:
+        - "Environment: sessionboard-dev  (from ./sbxenv.yaml)"
+        - ""
+        - "The following changes will be made OUTSIDE the sandbox:"
+        - ""
+        - "  + sandbox        sessionboard-dev (claude)"
+        - "  + workspace      /Users/you/code/sessionboard (rw)"
+        - "  + kit            ./kits/sessionboard"
+        - "  + kit            docker.io/sbx/github-ssh-kit:latest"
+        - "  + secret         github  ← command: gh auth token"
+        - "  + binding        github  apiKey → api.github.com, github.com"
+        - "  + mcp server     context7  https://mcp.context7.com/mcp"
+        - "  + port           3000 → 3000/tcp4"
+        - ""
+        - "Plan: 8 to add, 0 to change, 0 to destroy."
+        - "Run `sbx env run` to apply."
+
+  - id: env-run-create
+    completes: run-env
+    when:
+      command: sbx env run
+      state: { env.created: false }
+    then:
+      state:
+        env.created: true
+        ports.api: true
+        secret.github: true
+      output:
+        - "Environment: sessionboard-dev  (from ./sbxenv.yaml)"
+        - "Plan: 8 to add, 0 to change, 0 to destroy."
+        - "Apply these changes? [y/N] y"
+        - ""
+        - "── RESOLVE SETUP"
+        - "     sandbox    sessionboard-dev"
+        - "     agent      claude"
+        - "     kits       sessionboard (mixin), github-ssh (mixin)"
+        - { text: "   ✓ configuration resolved", delay: short }
+        - "── APPLY KITS"
+        - { text: "   → sessionboard: install (2 commands)", delay: install }
+        - { text: "   → github-ssh: install (1 command)", delay: install }
+        - "   ✓ kits applied"
+        - "── CREATE SANDBOX"
+        - { text: "   ✓ Created sandbox sessionboard-dev", delay: boot }
+        - "── PUBLISH PORTS"
+        - "   ✓ 127.0.0.1:3000 -> 3000/tcp4"
+        - ""
+      session:
+        prompt: "› "
+        intro:
+          - ""
+          - "Claude Code is running in sessionboard-dev. Type /exit to detach."
+        outro:
+          - "Detached from sessionboard-dev."
+
+  # The gotcha: editing the file and re-running does NOT re-apply kits or ports.
+
+  - id: env-run-existing
+    when:
+      command: sbx env run
+      state: { env.created: true }
+    then:
+      output:
+        - "Environment: sessionboard-dev  (from ./sbxenv.yaml)"
+        - ""
+        - "Note: kits, ports, workspaces, secrets, and sandboxOptions only apply when the"
+        - "      sandbox is created. The existing sandbox keeps the set it was created with."
+        - "      Run `sbx env rm` and `sbx env run` to apply them."
+        - ""
+        - "Reattaching to sessionboard-dev…"
+      session:
+        prompt: "› "
+        intro:
+          - ""
+          - "Claude Code is running in sessionboard-dev. Type /exit to detach."
+        outro:
+          - "Detached from sessionboard-dev."
+
+  - id: env-exec
+    completes: exec-env
+    when:
+      command: sbx env exec
+    then:
+      output:
+        - "> sessionboard-api@1.0.0 test"
+        - "> jest"
+        - ""
+        - { text: "PASS  api/server.test.js", delay: install }
+        - "  ✓ GET /healthz reports ok (28 ms)"
+        - "  ✓ GET /api/sessions returns the schedule (41 ms)"
+        - ""
+        - "Test Suites: 1 passed, 1 total"
+        - "Tests:       2 passed, 2 total"
+
+  # =========================================================================
+  # Section 4 — The full environment
+  # =========================================================================
+
+  - id: env-rm
+    completes: recreate-env
+    when:
+      command: sbx env rm
+    then:
+      state:
+        env.created: false
+        ports.api: false
+      output:
+        - "Environment: sessionboard-dev  (from ./sbxenv.yaml)"
+        - ""
+        - "The following will be REMOVED:"
+        - "  - sandbox        sessionboard-dev"
+        - "  - port           3000 → 3000/tcp4"
+        - ""
+        - "Plan: 0 to add, 0 to change, 2 to destroy."
+        - "Apply these changes? [y/N] y"
+        - ""
+        - "Deleting sandbox sessionboard-dev..."
+        - "Environment 'sessionboard-dev' removed"
+
+  - id: sbx-ls-with-ports
+    when:
+      command: sbx ls
+      state: { ports.api: true }
+    then:
+      output:
+        - "SANDBOX        AGENT    STATUS    PORTS                       WORKSPACE"
+        - "sessionboard   claude   running   127.0.0.1:3000->3000/tcp4   /Users/you/code/sessionboard"
+
+  - id: sbx-ls
+    when:
+      command: sbx ls
+    then:
+      output:
+        - "SANDBOX        AGENT    STATUS    PORTS   WORKSPACE"
+        - "sessionboard   claude   running           /Users/you/code/sessionboard"
+
+  - id: ports-list-api
+    when:
+      command: sbx ports
+      state: { ports.api: true }
+    then:
+      output:
+        - "HOST IP     HOST PORT   SANDBOX PORT   PROTOCOL"
+        - "127.0.0.1   3000        3000           tcp"
+
+  - id: ports-list-empty
+    when:
+      command: sbx ports
+    then:
+      output:
+        - "No published ports"
+
+  # =========================================================================
+  # Section 2 — Customizing the sandbox with kits
+  # =========================================================================

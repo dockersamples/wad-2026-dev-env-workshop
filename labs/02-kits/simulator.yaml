@@ -1,0 +1,224 @@
+version: "2.0"
+
+metadata:
+  id: kits
+  title: "Customizing the sandbox with kits"
+  summary: "Read a published kit, get past the source allowlist, write your own, and add it to a running sandbox."
+
+# Picks up where module 1 left off: a sandbox called `sessionboard` exists,
+# with the API's port published.
+state:
+  sandbox:
+    created: true
+  policy:
+    kitSourcesWidened: false
+  ports:
+    api: true
+  kit:
+    validated: false
+    added: false
+
+settings:
+  pace:
+    pull: 700
+    boot: 1100
+    install: 900
+
+controls:
+  - id: kit-sources
+    label: "Widen the kit source allowlist"
+    description: "Permits kits from github.com/docker/. Same state `sbx settings set kit.allowedSources` writes."
+    state: policy.kitSourcesWidened
+    enabled: true
+    disabled: false
+
+defaults:
+  unmatched:
+    stderr:
+      - "That command isn't part of this module. Check the instructions on the left, or use Reset to start over."
+    exit: 127
+
+scenarios:
+  - id: sbx-version
+    when:
+      command: sbx version
+    then:
+      output:
+        - "sbx version: v0.45.0 9f2c41a7b0e5d38c6a1f4b2e7d905c8134ae6b22"
+
+  # `sbx run claude` is only useful in the Agent tab — it attaches you to the
+  # agent and that terminal is then busy for the rest of the lab.
+
+  - id: kit-inspect-code-server
+    completes: inspect-kit
+    when:
+      command: sbx kit inspect
+    then:
+      output:
+        - "Name:        code-server"
+        - "Kind:        mixin"
+        - "Schema:      v2"
+        - "Display:     code-server (web VS Code) with Claude Code"
+        - "Description: Runs code-server on port 8080, opened on the sandbox workspace, with the"
+        - "             Claude Code VS Code extension preinstalled."
+        - ""
+        - "Requires:"
+        - "  Agent:        claude"
+        - ""
+        - "Policies:"
+        - "  Network:      8 allow, 0 deny"
+        - "  Credentials:  0 services"
+        - "  Ports:        1 (8080/tcp code-server)"
+        - ""
+        - "Setup:"
+        - "  Install:      2 commands"
+        - "  Startup:      1 command"
+        - "  Files:        1"
+
+  # The allowlist wall. Learners are meant to hit this before they fix it.
+
+  - id: kit-source-blocked
+    when:
+      command: sbx run
+      args:
+        --kit: { any: true }
+      state: { policy.kitSourcesWidened: false }
+    then:
+      stderr:
+        - "ERROR: resolve kits: kit \"{{ args.kit }}\" cannot be installed — its source is not in your allowlist."
+        - ""
+        - "Allowed sources: docker.io/"
+        - "Change with: sbx settings set kit.allowedSources '[\"docker.io/\", ...]'"
+      exit: 1
+
+  - id: settings-get-allowed-sources
+    when:
+      command: sbx settings get kit.allowedSources
+      state: { policy.kitSourcesWidened: false }
+    then:
+      output:
+        - "[\"docker.io/\"]"
+
+  - id: settings-get-allowed-sources-widened
+    when:
+      command: sbx settings get kit.allowedSources
+    then:
+      output:
+        - "[\"docker.io/\",\"github.com/docker/\"]"
+
+  - id: settings-set-allowed-sources
+    completes: widen-allowlist
+    when:
+      command: sbx settings set kit.allowedSources
+    then:
+      state:
+        policy.kitSourcesWidened: true
+      output:
+        - "Setting \"kit.allowedSources\" set to [\"docker.io/\",\"github.com/docker/\"]"
+
+  - id: kit-run-with-mixins
+    when:
+      command: sbx run
+      args:
+        --kit: { any: true }
+      state: { policy.kitSourcesWidened: true }
+    then:
+      output:
+        - "── RESOLVE SETUP"
+        - "   resolving configuration…"
+        - "     sandbox    sessionboard-kits"
+        - "     agent      claude"
+        - "     kits       vale (mixin)"
+        - { text: "   ✓ configuration resolved", delay: short }
+        - "── APPLY KITS"
+        - { text: "   → vale: install (1 command)", delay: install }
+        - "   ✓ kits applied"
+        - "── CREATE SANDBOX"
+        - { text: "   ✓ Created sandbox sessionboard-kits", delay: boot }
+
+  - id: kit-validate-good
+    completes: validate-kit
+    when:
+      command: sbx kit validate
+      state: { kit.validated: false }
+    then:
+      state:
+        kit.validated: true
+      output:
+        - "VALID: ./kits/sessionboard (directory)"
+
+  - id: kit-validate-again
+    when:
+      command: sbx kit validate
+    then:
+      output:
+        - "VALID: ./kits/sessionboard (directory)"
+
+  - id: kit-add
+    completes: add-kit
+    when:
+      command: sbx kit add
+    then:
+      state:
+        kit.added: true
+        app.running: true
+      output:
+        - "Recreating sandbox \"sessionboard\" to apply augmented kit list…"
+        - { text: "  Swap container sessionboard-swap-9678474c started.", delay: boot }
+        - { text: "  → sessionboard: install (2 commands)", delay: install }
+        - { text: "  → sessionboard: startup (1 command, background)", delay: short }
+        - "Kit \"sessionboard\" added to sandbox \"sessionboard\""
+
+  - id: compose-ps-in-sandbox
+    when:
+      command: sbx exec
+      state: { kit.added: true }
+    then:
+      output:
+        - "NAME                  IMAGE                COMMAND                  SERVICE   STATUS         PORTS"
+        - "sessionboard-api-1    sessionboard-api     \"node server.js\"         api       Up 12 seconds  3000/tcp"
+        - "sessionboard-db-1     postgres:17-alpine   \"docker-entrypoint.s…\"   db        Up 13 seconds  5432/tcp"
+
+  - id: sbx-exec-generic
+    when:
+      command: sbx exec
+    then:
+      output:
+        - "sessionboard-api-1 listening on :3000"
+
+  - id: kit-push
+    when:
+      command: sbx kit push
+    then:
+      output:
+        - "Packing ./kits/sessionboard…"
+        - { text: "Pushing to docker.io/wearedevs/sessionboard-kit:1.0", delay: pull }
+        - "Pushed docker.io/wearedevs/sessionboard-kit:1.0"
+        - "  digest: sha256:41d0e7a3c8b5f92e6d47a10b8c3f5e29d7146ba0e83c5f27ad91b46e0c7f8352"
+
+  # =========================================================================
+  # Section 3 — Sharing the environment with sbxenv
+  # =========================================================================
+
+  - id: sbx-ls
+    when:
+      command: sbx ls
+    then:
+      output:
+        - "SANDBOX        AGENT    STATUS    PORTS   WORKSPACE"
+        - "sessionboard   claude   running           /Users/you/code/sessionboard"
+
+  - id: policy-ls
+    when:
+      command: sbx policy ls
+    then:
+      output:
+        - "Policy for sandbox: sessionboard"
+        - "NETWORK"
+        - "  allow 193 hosts from 0ffce046-2498-4430-8682-5bbcbea770a3, 1176de49-245d-4db0-949a-bbb090459037, local-policy"
+        - ""
+        - "FILESYSTEM"
+        - "  read allow all paths from local-policy"
+        - "  write allow all paths from local-policy"
+        - ""
+        - "Details: sbx policy ls sessionboard --wide"

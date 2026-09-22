@@ -1,0 +1,28 @@
+kind: slides
+
+title: "2 · Customizing the sandbox with kits"
+description: "Kits: what they declare, the source allowlist, and the project kit that ships your team's conventions."
+
+catalog:
+  title: "2 · Customizing the sandbox with kits — slides"
+  icon: co_present
+  tags: ["slides", "module 2"]
+  estimatedMinutes: 12
+  order: 3
+
+# Bump when you add or remove a slide — slide ids are positional, so an
+# insertion mid-chapter shifts every id after it.
+version: "1.0.0"
+
+theme: light
+
+brand:
+  # Drop a logo in this deck's assets/ and point at it here. The dark slides
+  # then each need a per-slide `logo:` with the reversed (white) mark:
+  #   grep -n "theme: dark" *.md
+  eyebrow: "2 · Customizing the sandbox with kits"
+  source: "WeAreDevelopers · 2026"
+
+slides:
+  - title: Customizing with kits
+    contentPath: 00-kits.md

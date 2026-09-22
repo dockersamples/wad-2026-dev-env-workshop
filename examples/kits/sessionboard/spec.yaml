@@ -1,0 +1,78 @@
+# The project kit: everything a SessionBoard sandbox needs that isn't the
+# agent itself. Referenced by path from sbxenv.yaml, so it needs no publishing
+# and no allowlist change (local kits are governed by `kit.allowLocalKits`,
+# which defaults to true).
+schemaVersion: "2"
+kind: mixin
+name: sessionboard
+displayName: SessionBoard project setup
+description: Node tooling, the Compose stack, and project conventions for SessionBoard.
+
+args:
+  dir:
+    default: "/home/agent/workspace"
+    description: Absolute path to the SessionBoard project root inside the sandbox.
+    pattern: '^/[A-Za-z0-9._/-]+$'
+
+permissions:
+  network:
+    # The complete outbound contract for this kit. `npm ci` needs the registry;
+    # apt needs Debian's mirrors for the postgresql-client install below.
+    allow:
+      - registry.npmjs.org
+      - deb.debian.org
+      - security.debian.org
+
+ports:
+  - container: 3000
+    protocol: tcp
+    name: api
+
+setup:
+  install:
+    # Runs ONCE, at sandbox creation, and is baked into the VM.
+    - command: npm ci --prefix '${{ kit.args.dir }}/api'
+      user: "1000"
+      description: Install API dependencies
+
+    - command: |
+        apt-get update -qq
+        apt-get install -y -qq --no-install-recommends postgresql-client
+        rm -rf /var/lib/apt/lists/*
+      user: "0"
+      description: psql, for inspecting the database directly
+
+  startup:
+    # Runs at EVERY sandbox start, so it has to be idempotent. `up -d` is;
+    # plain `up` is not.
+    - command:
+        - docker
+        - compose
+        - --project-directory
+        - "${{ kit.args.dir }}"
+        - up
+        - "-d"
+      user: "1000"
+      background: true
+      description: Bring the SessionBoard stack up
+
+agentInstructions:
+  # Lands in kits-memory/sessionboard.md next to the agent's memory file, with
+  # a pointer from its "## Kits" section. This is how project conventions ship
+  # with the environment instead of living in one person's head.
+  content: |
+    ## SessionBoard
+
+    The stack is already running — `docker compose up -d` runs at sandbox
+    start. The API is on port 3000; Postgres is reachable as `db:5432` and
+    via `$DATABASE_URL`.
+
+    The project root is `${{ kit.args.dir }}`.
+
+    - Run the tests with `npm test --prefix ${{ kit.args.dir }}/api`. Run them
+      before saying a change is done.
+    - Schema lives in `${{ kit.args.dir }}/db/`. Never edit an applied
+      migration; add a new one.
+    - `psql $DATABASE_URL` is available for inspecting data directly.
+    - The API must bind `0.0.0.0`, not `127.0.0.1`, or the published port on
+      the host has nothing to connect to.

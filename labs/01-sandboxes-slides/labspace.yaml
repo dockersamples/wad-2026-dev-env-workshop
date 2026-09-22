@@ -1,0 +1,30 @@
+kind: slides
+
+title: "1 · Sandboxes and the boundary"
+description: "Why a container stopped being enough for an agent, and what a microVM gives you instead."
+
+catalog:
+  title: "1 · Sandboxes and the boundary — slides"
+  icon: co_present
+  tags: ["slides", "module 1"]
+  estimatedMinutes: 14
+  order: 1
+
+# Bump when you add or remove a slide — slide ids are positional, so an
+# insertion mid-chapter shifts every id after it.
+version: "1.0.0"
+
+theme: light
+
+brand:
+  # Drop a logo in this deck's assets/ and point at it here. The dark slides
+  # then each need a per-slide `logo:` with the reversed (white) mark:
+  #   grep -n "theme: dark" *.md
+  eyebrow: "1 · Sandboxes and the boundary"
+  source: "WeAreDevelopers · 2026"
+
+slides:
+  - title: Opening
+    contentPath: 00-opening.md
+  - title: Sandboxes and the boundary
+    contentPath: 01-sandboxes.md

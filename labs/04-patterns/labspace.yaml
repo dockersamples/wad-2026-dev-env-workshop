@@ -1,0 +1,120 @@
+title: "4 · Patterns, tradeoffs, and what’s next"
+description: "Workspace modes and what they really cost you, the full devcontainers-taken-seriously environment, and Kit v3."
+
+catalog:
+  title: "4 · Patterns, tradeoffs, and what’s next — hands on"
+  icon: rocket_launch
+  tags: ["hands-on", "module 4"]
+  estimatedMinutes: 10
+  order: 8
+
+simulator: simulator.yaml
+
+terminals:
+  - id: host
+    title: Your machine
+    icon: terminal
+
+files:
+  compose.yaml: |
+    services:
+      api:
+        build: ./api
+        ports:
+          - "3000:3000"
+        environment:
+          DATABASE_URL: postgres://sessionboard:sessionboard@db:5432/sessionboard
+        depends_on:
+          db:
+            condition: service_healthy
+
+      db:
+        image: postgres:17-alpine
+        environment:
+          POSTGRES_USER: sessionboard
+          POSTGRES_PASSWORD: sessionboard
+          POSTGRES_DB: sessionboard
+        healthcheck:
+          test: ["CMD-SHELL", "pg_isready -U sessionboard"]
+          interval: 2s
+          retries: 15
+  README.md: |
+    # SessionBoard
+
+    Rate the talks at WeAreDevelopers. Express API, Postgres, one Compose file.
+
+    Run it:  docker compose up -d
+    Test it: npm test
+  api/server.js: |
+    const express = require('express');
+    const { Pool } = require('pg');
+
+    const app = express();
+    const db = new Pool({ connectionString: process.env.DATABASE_URL });
+
+    // routes
+    app.get('/healthz', async (_req, res) => {
+      try {
+        await db.query('select 1');
+        res.json({ status: 'ok' });
+      } catch (err) {
+        res.status(503).json({ status: 'degraded' });
+      }
+    });
+
+    app.get('/api/sessions', async (_req, res) => {
+      const { rows } = await db.query(
+        'select id, title, speaker, track, starts_at from sessions order by starts_at'
+      );
+      res.json(rows);
+    });
+
+    module.exports = app;
+
+    if (require.main === module) {
+      app.listen(3000, '0.0.0.0', () => console.log('listening on :3000'));
+    }
+  api/server.test.js: |
+    const request = require('supertest');
+    const app = require('./server');
+
+    test('GET /healthz reports ok', async () => {
+      const res = await request(app).get('/healthz');
+      expect(res.status).toBe(200);
+      expect(res.body.status).toBe('ok');
+    });
+  sbxenv.yaml: |
+    schemaVersion: "1"
+    name: sessionboard-dev
+    agent: claude
+
+    workspace:
+      path: .
+
+    kits:
+      - ./kits/sessionboard
+      - docker.io/sbx/github-ssh-kit:latest
+
+    secrets:
+      github:
+        command: gh auth token
+
+    ports:
+      - sandbox: 3000
+        host: 3000
+        protocol: tcp4
+
+sections:
+  - title: How the project gets in
+    contentPath: 00-workspaces.md
+
+  - title: Devcontainers, taken seriously
+    contentPath: 01-the-pattern.md
+    steps:
+      - id: full-env-up
+        title: "Start the full environment"
+      - id: reach-the-app
+        title: "Reach the app through the published port"
+
+  - title: What's next for kits
+    contentPath: 02-whats-next.md

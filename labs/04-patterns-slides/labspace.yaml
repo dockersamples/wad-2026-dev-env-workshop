@@ -1,0 +1,28 @@
+kind: slides
+
+title: "4 · Patterns, tradeoffs, and what’s next"
+description: "Workspace modes and their real tradeoffs, the devcontainers-taken-seriously pattern, and Kit v3."
+
+catalog:
+  title: "4 · Patterns, tradeoffs, and what’s next — slides"
+  icon: co_present
+  tags: ["slides", "module 4"]
+  estimatedMinutes: 12
+  order: 7
+
+# Bump when you add or remove a slide — slide ids are positional, so an
+# insertion mid-chapter shifts every id after it.
+version: "1.0.0"
+
+theme: light
+
+brand:
+  # Drop a logo in this deck's assets/ and point at it here. The dark slides
+  # then each need a per-slide `logo:` with the reversed (white) mark:
+  #   grep -n "theme: dark" *.md
+  eyebrow: "4 · Patterns, tradeoffs, and what’s next"
+  source: "WeAreDevelopers · 2026"
+
+slides:
+  - title: Patterns and what's next
+    contentPath: 00-patterns.md

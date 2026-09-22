@@ -1,0 +1,33 @@
+schemaVersion: "1"
+name: learn
+agent: claude
+
+kits:
+  - ./kits/dev-setup
+  - docker.io/sbx/code-server-kit:20260910-34edb9066bc5d091ce74a30d8f65e2ffc89d2f21
+
+  # Configure GitHub access and code signing
+  - docker.io/sbx/git-ssh-sign-kit:20260910-34edb9066bc5d091ce74a30d8f65e2ffc89d2f21
+  - docker.io/sbx/github-ssh-kit:20260910-34edb9066bc5d091ce74a30d8f65e2ffc89d2f21
+
+workspace:
+  path: .
+  clone: true
+
+additionalWorkspaces: []
+
+sandboxOptions:
+  memory: 4g
+  cpus: 4
+  pullPolicy: always
+
+ports:
+  - sandbox: 4321
+    host: 4321
+    protocol: tcp4
+  - sandbox: 4322
+    host: 4322
+    protocol: tcp4
+  - sandbox: 8080
+    host: 8080
+    protocol: tcp4

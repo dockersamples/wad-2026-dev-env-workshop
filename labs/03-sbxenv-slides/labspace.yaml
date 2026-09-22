@@ -1,0 +1,28 @@
+kind: slides
+
+title: "3 · Sharing the environment with sbxenv"
+description: "One committed file for the agent, kits, credentials, MCP servers, ports, and machine size."
+
+catalog:
+  title: "3 · Sharing the environment with sbxenv — slides"
+  icon: co_present
+  tags: ["slides", "module 3"]
+  estimatedMinutes: 10
+  order: 5
+
+# Bump when you add or remove a slide — slide ids are positional, so an
+# insertion mid-chapter shifts every id after it.
+version: "1.0.0"
+
+theme: light
+
+brand:
+  # Drop a logo in this deck's assets/ and point at it here. The dark slides
+  # then each need a per-slide `logo:` with the reversed (white) mark:
+  #   grep -n "theme: dark" *.md
+  eyebrow: "3 · Sharing the environment with sbxenv"
+  source: "WeAreDevelopers · 2026"
+
+slides:
+  - title: Sharing the environment
+    contentPath: 00-sbxenv.md

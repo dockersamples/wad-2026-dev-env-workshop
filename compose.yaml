@@ -15,7 +15,7 @@ services:
   # Live preview. Edits to ./labs show on browser refresh. The catalog (labs.json)
   # is generated on the fly by the app, so there's nothing to build.
   dev:
-    image: ${SIMSPACE_AUTHORING_IMAGE:-dockersamples/simspace-authoring:latest}
+    image: ${SIMSPACE_AUTHORING_IMAGE:-dockersamples/simspace-authoring:docker-next}
     command: npm run dev
     ports:
       - "5173:5173"
@@ -50,7 +50,7 @@ services:
   # One-shot validator: checks every lab under labs/ and regenerates labs.json.
   # Run with `docker compose run --rm validate`.
   validate:
-    image: ${SIMSPACE_AUTHORING_IMAGE:-dockersamples/simspace-authoring:latest}
+    image: ${SIMSPACE_AUTHORING_IMAGE:-dockersamples/simspace-authoring:docker-next}
     profiles: ["tools"]
     command: npm run validate-lab -- /labs
     volumes:

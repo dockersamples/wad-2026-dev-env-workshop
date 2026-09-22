@@ -1,0 +1,109 @@
+title: "1 · Sandboxes and the boundary"
+description: "Start an agent in a microVM, prove the isolation is real, and change what it can reach while it's running."
+
+catalog:
+  title: "1 · Sandboxes and the boundary — hands on"
+  icon: shield_lock
+  tags: ["hands-on", "module 1"]
+  estimatedMinutes: 15
+  order: 2
+
+simulator: simulator.yaml
+
+# Two terminals, one machine-state. That split is the module: `sbx` commands
+# are typed on your machine, and the agent feels them from the other side of
+# the boundary without a restart.
+terminals:
+  - id: host
+    title: Your machine
+    icon: terminal
+  - id: agent
+    title: Agent session
+    icon: smart_toy
+
+files:
+  compose.yaml: |
+    services:
+      api:
+        build: ./api
+        ports:
+          - "3000:3000"
+        environment:
+          DATABASE_URL: postgres://sessionboard:sessionboard@db:5432/sessionboard
+        depends_on:
+          db:
+            condition: service_healthy
+
+      db:
+        image: postgres:17-alpine
+        environment:
+          POSTGRES_USER: sessionboard
+          POSTGRES_PASSWORD: sessionboard
+          POSTGRES_DB: sessionboard
+        healthcheck:
+          test: ["CMD-SHELL", "pg_isready -U sessionboard"]
+          interval: 2s
+          retries: 15
+  README.md: |
+    # SessionBoard
+
+    Rate the talks at WeAreDevelopers. Express API, Postgres, one Compose file.
+
+    Run it:  docker compose up -d
+    Test it: npm test
+  api/server.js: |
+    const express = require('express');
+    const { Pool } = require('pg');
+
+    const app = express();
+    const db = new Pool({ connectionString: process.env.DATABASE_URL });
+
+    // routes
+    app.get('/api/sessions', async (_req, res) => {
+      const { rows } = await db.query(
+        'select id, title, speaker, track, starts_at from sessions order by starts_at'
+      );
+      res.json(rows);
+    });
+
+    module.exports = app;
+
+    if (require.main === module) {
+      app.listen(3000, '0.0.0.0', () => console.log('listening on :3000'));
+    }
+
+sections:
+  - title: Before you start
+    contentPath: 00-welcome.md
+
+  - title: Start a sandbox
+    contentPath: 01-start.md
+    steps:
+      - id: run-sandbox
+        title: "Start an agent in a sandbox"
+
+  - title: Two daemons, one machine
+    contentPath: 02-isolation.md
+    steps:
+      - id: separate-daemon
+        title: "Prove the Docker daemon is separate"
+
+  - title: The network boundary
+    contentPath: 03-network.md
+    steps:
+      - id: blocked-by-policy
+        title: "Watch the network policy block the agent"
+      - id: allow-domain
+        title: "Allow a domain while the agent is running"
+
+  - title: Credentials
+    contentPath: 04-credentials.md
+    steps:
+      - id: store-secret
+        title: "Store a credential the agent never sees"
+
+  - title: Getting a port back out
+    contentPath: 05-ports.md
+    steps:
+      - id: publish-port
+        title: "Publish a port to your browser"

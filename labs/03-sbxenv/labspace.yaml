@@ -1,0 +1,144 @@
+title: "3 · Sharing the environment with sbxenv"
+description: "Turn a pile of flags into one committed file, read the plan before it runs, and meet the recreate rule."
+
+catalog:
+  title: "3 · Sharing the environment with sbxenv — hands on"
+  icon: description
+  tags: ["hands-on", "module 3"]
+  estimatedMinutes: 12
+  order: 6
+
+simulator: simulator.yaml
+
+terminals:
+  - id: host
+    title: Your machine
+    icon: terminal
+
+files:
+  compose.yaml: |
+    services:
+      api:
+        build: ./api
+        ports:
+          - "3000:3000"
+        environment:
+          DATABASE_URL: postgres://sessionboard:sessionboard@db:5432/sessionboard
+        depends_on:
+          db:
+            condition: service_healthy
+
+      db:
+        image: postgres:17-alpine
+        environment:
+          POSTGRES_USER: sessionboard
+          POSTGRES_PASSWORD: sessionboard
+          POSTGRES_DB: sessionboard
+        healthcheck:
+          test: ["CMD-SHELL", "pg_isready -U sessionboard"]
+          interval: 2s
+          retries: 15
+  README.md: |
+    # SessionBoard
+
+    Rate the talks at WeAreDevelopers. Express API, Postgres, one Compose file.
+
+    Run it:  docker compose up -d
+    Test it: npm test
+  api/server.js: |
+    const express = require('express');
+    const { Pool } = require('pg');
+
+    const app = express();
+    const db = new Pool({ connectionString: process.env.DATABASE_URL });
+
+    // routes
+    app.get('/healthz', async (_req, res) => {
+      try {
+        await db.query('select 1');
+        res.json({ status: 'ok' });
+      } catch (err) {
+        res.status(503).json({ status: 'degraded' });
+      }
+    });
+
+    app.get('/api/sessions', async (_req, res) => {
+      const { rows } = await db.query(
+        'select id, title, speaker, track, starts_at from sessions order by starts_at'
+      );
+      res.json(rows);
+    });
+
+    module.exports = app;
+
+    if (require.main === module) {
+      app.listen(3000, '0.0.0.0', () => console.log('listening on :3000'));
+    }
+  api/server.test.js: |
+    const request = require('supertest');
+    const app = require('./server');
+
+    test('GET /healthz reports ok', async () => {
+      const res = await request(app).get('/healthz');
+      expect(res.status).toBe(200);
+      expect(res.body.status).toBe('ok');
+    });
+  kits/sessionboard/spec.yaml: |
+    schemaVersion: "2"
+    kind: mixin
+    name: sessionboard
+    displayName: SessionBoard project setup
+    description: Node tooling, the Compose stack, and project conventions for SessionBoard.
+
+    permissions:
+      network:
+        allow:
+          - registry.npmjs.org
+          - deb.debian.org
+
+    ports:
+      - container: 3000
+        protocol: tcp
+        name: api
+
+    setup:
+      install:
+        - command: npm ci --prefix /home/agent/workspace/api
+          user: "1000"
+        - command: apt-get update && apt-get install -y --no-install-recommends postgresql-client
+          user: "0"
+      startup:
+        - command: ["docker", "compose", "up", "-d"]
+          user: "1000"
+          background: true
+
+    agentInstructions:
+      content: |
+        ## SessionBoard
+
+        The stack is already running. Run the tests with
+        `npm test --prefix api` before saying a change is done.
+
+sections:
+  - title: One file for the environment
+    contentPath: 00-the-file.md
+
+  - title: Read the plan, then run it
+    contentPath: 01-plan-and-run.md
+    steps:
+      - id: plan-env
+        title: "Read the environment plan"
+      - id: run-env
+        title: "Start the environment"
+
+  - title: The same file everywhere
+    contentPath: 02-automation.md
+    steps:
+      - id: exec-env
+        title: "Run the test suite in the environment"
+
+  - title: What applies when
+    contentPath: 03-recreate.md
+    steps:
+      - id: recreate-env
+        title: "Tear it down so a change can apply"

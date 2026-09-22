@@ -1,0 +1,110 @@
+title: "2 · Customizing the sandbox with kits"
+description: "Read a published kit, get past the source allowlist, write one for your project, and add it to a running sandbox."
+
+catalog:
+  title: "2 · Customizing the sandbox with kits — hands on"
+  icon: extension
+  tags: ["hands-on", "module 2"]
+  estimatedMinutes: 18
+  order: 4
+
+simulator: simulator.yaml
+
+terminals:
+  - id: host
+    title: Your machine
+    icon: terminal
+
+files:
+  compose.yaml: |
+    services:
+      api:
+        build: ./api
+        ports:
+          - "3000:3000"
+        environment:
+          DATABASE_URL: postgres://sessionboard:sessionboard@db:5432/sessionboard
+        depends_on:
+          db:
+            condition: service_healthy
+
+      db:
+        image: postgres:17-alpine
+        environment:
+          POSTGRES_USER: sessionboard
+          POSTGRES_PASSWORD: sessionboard
+          POSTGRES_DB: sessionboard
+        healthcheck:
+          test: ["CMD-SHELL", "pg_isready -U sessionboard"]
+          interval: 2s
+          retries: 15
+  README.md: |
+    # SessionBoard
+
+    Rate the talks at WeAreDevelopers. Express API, Postgres, one Compose file.
+
+    Run it:  docker compose up -d
+    Test it: npm test
+  api/server.js: |
+    const express = require('express');
+    const { Pool } = require('pg');
+
+    const app = express();
+    const db = new Pool({ connectionString: process.env.DATABASE_URL });
+
+    // routes
+    app.get('/healthz', async (_req, res) => {
+      try {
+        await db.query('select 1');
+        res.json({ status: 'ok' });
+      } catch (err) {
+        res.status(503).json({ status: 'degraded' });
+      }
+    });
+
+    app.get('/api/sessions', async (_req, res) => {
+      const { rows } = await db.query(
+        'select id, title, speaker, track, starts_at from sessions order by starts_at'
+      );
+      res.json(rows);
+    });
+
+    module.exports = app;
+
+    if (require.main === module) {
+      app.listen(3000, '0.0.0.0', () => console.log('listening on :3000'));
+    }
+  api/server.test.js: |
+    const request = require('supertest');
+    const app = require('./server');
+
+    test('GET /healthz reports ok', async () => {
+      const res = await request(app).get('/healthz');
+      expect(res.status).toBe(200);
+      expect(res.body.status).toBe('ok');
+    });
+
+sections:
+  - title: What a kit is
+    contentPath: 00-anatomy.md
+    steps:
+      - id: inspect-kit
+        title: "Inspect a published kit"
+
+  - title: Where kits come from
+    contentPath: 01-sources.md
+    steps:
+      - id: widen-allowlist
+        title: "Widen the kit source allowlist"
+
+  - title: Write one for your project
+    contentPath: 02-write-one.md
+    steps:
+      - id: validate-kit
+        title: "Write and validate your own kit"
+
+  - title: Iterate, then share it
+    contentPath: 03-iterate.md
+    steps:
+      - id: add-kit
+        title: "Add your kit to a running sandbox"

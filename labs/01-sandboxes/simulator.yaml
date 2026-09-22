@@ -1,0 +1,416 @@
+version: "2.0"
+
+metadata:
+  id: sandboxes
+  title: "Sandboxes and the boundary"
+  summary: "Start an agent in a microVM, prove the isolation, and change the boundary while it runs."
+
+# Two terminals share this state tree, which is the whole point of this module:
+# a `sbx policy allow` typed on "Your machine" changes what the agent attached
+# in the other tab can reach, with no restart.
+state:
+  sandbox:
+    created: false
+  agent:
+    healthzDone: false
+  policy:
+    npmAllowed: false
+  secret:
+    github: false
+  ports:
+    api: false
+
+settings:
+  pace:
+    pull: 700 # layer download
+    boot: 1100 # microVM boot
+    think: 800 # agent "thinking"
+    install: 900 # apt/npm install step
+
+controls:
+  - id: npm-allowed
+    label: "Allow registry.npmjs.org"
+    description: "The network rule the agent needs to install a dependency. Same state `sbx policy allow network` writes."
+    state: policy.npmAllowed
+    enabled: true
+    disabled: false
+
+defaults:
+  unmatched:
+    stderr:
+      - "That command isn't part of this module. Check the instructions on the left, or use Reset to start over."
+    exit: 127
+
+scenarios:
+  - id: sbx-version
+    when:
+      command: sbx version
+    then:
+      output:
+        - "sbx version: v0.45.0 9f2c41a7b0e5d38c6a1f4b2e7d905c8134ae6b22"
+
+  # `sbx run claude` is only useful in the Agent tab — it attaches you to the
+  # agent and that terminal is then busy for the rest of the lab.
+
+  - id: sbx-run-wrong-terminal
+    when:
+      command: sbx run
+      terminal: host
+    then:
+      stderr:
+        - "Run this in the Agent session tab — `sbx run` attaches your terminal to the agent, and you want this one free for `sbx` commands."
+      exit: 1
+
+  - id: sbx-run-claude
+    completes: run-sandbox
+    when:
+      command: sbx run
+      terminal: agent
+      state: { sandbox.created: false }
+    then:
+      state:
+        sandbox.created: true
+      output:
+        - "── RESOLVE SETUP"
+        - "   resolving configuration…"
+        - "     sandbox    sessionboard"
+        - "     agent      claude"
+        - "     workspace  /Users/you/code/sessionboard (rw)"
+        - "     image      docker/sandbox-templates:claude-code-docker"
+        - "     cpu        8"
+        - "     memory     16 GiB"
+        - { text: "   ✓ configuration resolved", delay: short }
+        - "── PREPARE IMAGE"
+        - "   → pull docker/sandbox-templates:claude-code-docker"
+        - { text: "     b576c7b820e2 downloaded  322.9 MB", delay: pull }
+        - { text: "     40385d0c1554 downloaded  96.6 MB", delay: pull }
+        - { text: "     9c0bc632c009 downloaded  89.6 MB", delay: pull }
+        - { text: "     163775e6c0a2 downloaded  21.2 MB", delay: pull }
+        - { text: "   ✓ image ready", delay: short }
+        - "── CREATE SANDBOX"
+        - { text: "   ✓ Created sandbox sessionboard", delay: boot }
+      session:
+        prompt: "› "
+        intro:
+          - ""
+          - "Claude Code is running inside the sandbox."
+          - "Ask it to work on SessionBoard. Type /exit to detach."
+        outro:
+          - "Detached from sessionboard. The sandbox keeps running — `sbx run --name sessionboard` reattaches."
+
+  - id: sbx-run-reattach
+    when:
+      command: sbx run
+      terminal: agent
+      state: { sandbox.created: true }
+    then:
+      output:
+        - "Reattaching to sandbox sessionboard…"
+      session:
+        prompt: "› "
+        intro:
+          - ""
+          - "Claude Code is running inside the sandbox."
+          - "Type /exit to detach."
+        outro:
+          - "Detached from sessionboard."
+
+  # The separate-daemon proof. `docker ps` means two different things depending
+  # on which side of the boundary you type it — so both are scripted.
+
+  - id: docker-ps-host
+    when:
+      command: docker ps
+      terminal: host
+    then:
+      output:
+        - "CONTAINER ID   IMAGE                 COMMAND                  CREATED       STATUS       PORTS                    NAMES"
+        - "3f9a1c40b7e2   grafana/grafana       \"/run.sh\"                2 days ago    Up 2 days    0.0.0.0:3001->3000/tcp   grafana"
+        - "b81d6e2a5c93   postgres:17-alpine    \"docker-entrypoint.s…\"   2 days ago    Up 2 days    0.0.0.0:5432->5432/tcp   local-pg"
+
+  - id: docker-ps-sandbox
+    completes: separate-daemon
+    when:
+      command: docker ps
+      terminal: agent
+    then:
+      output:
+        - "CONTAINER ID   IMAGE     COMMAND   CREATED   STATUS    PORTS     NAMES"
+
+  - id: docker-info-sandbox
+    when:
+      command: docker info
+      terminal: agent
+    then:
+      output:
+        - "Client: Docker Engine - Community"
+        - " Version:    28.6.0"
+        - ""
+        - "Server:"
+        - " Containers: 0"
+        - " Images: 0"
+        - " Server Version: 28.6.0"
+        - " Docker Root Dir: /var/lib/docker"
+        - " Name: sessionboard"
+
+  # --- The live policy demo -------------------------------------------------
+
+  - id: agent-healthz-blocked
+    completes: blocked-by-policy
+    when:
+      agent: true
+      promptContains: [healthz]
+      state: { policy.npmAllowed: false }
+    then:
+      output:
+        - { text: "I'll add a /healthz route and a test for it.", delay: think }
+        - ""
+        - "● Read(api/server.js)"
+        - "  ⎿  Read 34 lines"
+        - ""
+        - "● Bash(npm install --save-dev supertest)"
+        - { text: "  ⎿  npm error code ECONNREFUSED", delay: install }
+        - "     npm error network request to https://registry.npmjs.org/supertest failed"
+        - "     npm error network This is a problem related to network connectivity."
+        - ""
+        - "I can't reach registry.npmjs.org — the sandbox's network policy is blocking it."
+        - "Allow that host on the machine running the sandbox, then ask me again:"
+        - ""
+        - "  sbx policy allow network registry.npmjs.org"
+
+  - id: agent-healthz-allowed
+    when:
+      agent: true
+      promptContains: [healthz]
+      state: { policy.npmAllowed: true }
+    then:
+      state:
+        agent.healthzDone: true
+      files:
+        - replace: "api/server.js"
+          find: "// routes"
+          with: |
+            // routes
+            app.get('/healthz', async (_req, res) => {
+              try {
+                await db.query('select 1');
+                res.json({ status: 'ok' });
+              } catch (err) {
+                res.status(503).json({ status: 'degraded' });
+              }
+            });
+        - create: "api/server.test.js"
+          content: |
+            const request = require('supertest');
+            const app = require('./server');
+
+            test('GET /healthz reports ok', async () => {
+              const res = await request(app).get('/healthz');
+              expect(res.status).toBe(200);
+              expect(res.body.status).toBe('ok');
+            });
+      output:
+        - { text: "I'll add a /healthz route and a test for it.", delay: think }
+        - ""
+        - "● Bash(npm install --save-dev supertest)"
+        - { text: "  ⎿  added 41 packages in 3s", delay: install }
+        - ""
+        - "● Update(api/server.js)"
+        - "  ⎿  Added 9 lines"
+        - ""
+        - "● Write(api/server.test.js)"
+        - "  ⎿  Wrote 9 lines"
+        - ""
+        - "● Bash(npm test)"
+        - { text: "  ⎿  PASS  api/server.test.js", delay: install }
+        - "       ✓ GET /healthz reports ok (28 ms)"
+        - ""
+        - "Done. /healthz checks the database connection and returns 503 if it's down."
+        - "The install worked this time — registry.npmjs.org is reachable now."
+
+  - id: agent-catchall
+    when:
+      agent: true
+    then:
+      output:
+        - { text: "This lab scripts a few specific requests so everyone sees the same thing.", delay: think }
+        - "Use the prompt from the instructions on the left, or type /exit to detach."
+
+  # --- Policy commands (typed on the host, felt inside the sandbox) ---------
+
+  - id: policy-check-blocked
+    when:
+      command: sbx policy check network
+      state: { policy.npmAllowed: false }
+    then:
+      output:
+        - "Denied: registry.npmjs.org:443"
+        - "Governance: Local policy only"
+        - "Context: sandbox:sessionboard"
+        - "Reason: no matching allow rule (default deny)"
+
+  - id: policy-check-allowed
+    when:
+      command: sbx policy check network
+      state: { policy.npmAllowed: true }
+    then:
+      output:
+        - "Allowed: registry.npmjs.org:443"
+        - "Governance: Local policy only"
+        - "Context: sandbox:sessionboard"
+
+  - id: policy-allow-npm
+    completes: allow-domain
+    when:
+      command: sbx policy allow network
+    then:
+      state:
+        policy.npmAllowed: true
+      output:
+        - "Rule added to policy local (scope: sandbox:sessionboard): 6262859e-c9f2-4595-9e11-3b2a42a0b3a5 (registry.npmjs.org)"
+
+  - id: policy-deny
+    when:
+      command: sbx policy deny network
+    then:
+      state:
+        policy.npmAllowed: false
+      output:
+        - "Rule added to policy local (scope: sandbox:sessionboard): 930f1ab3-7712-4ad9-913a-1d4d6a634cd9 (registry.npmjs.org)"
+
+  - id: policy-ls
+    when:
+      command: sbx policy ls
+    then:
+      output:
+        - "Policy for sandbox: sessionboard"
+        - "NETWORK"
+        - "  allow 193 hosts from 0ffce046-2498-4430-8682-5bbcbea770a3, 1176de49-245d-4db0-949a-bbb090459037, local-policy"
+        - ""
+        - "FILESYSTEM"
+        - "  read allow all paths from local-policy"
+        - "  write allow all paths from local-policy"
+        - ""
+        - "Details: sbx policy ls sessionboard --wide"
+
+  - id: policy-log
+    when:
+      command: sbx policy log
+    then:
+      output:
+        - "TIME       SANDBOX        HOST                      DECISION   RULE                       PROXY"
+        - "09:41:02   sessionboard   api.anthropic.com:443     allow      default-ai-services        forward"
+        - "09:42:17   sessionboard   registry.npmjs.org:443    deny       (default deny)             forward"
+        - "09:43:55   sessionboard   registry.npmjs.org:443    allow      6262859e-c9f2-4595-9e11    forward"
+
+  # --- Secrets --------------------------------------------------------------
+
+  - id: secret-ls-empty
+    when:
+      command: sbx secret ls
+      state: { secret.github: false }
+    then:
+      output:
+        - "No secrets found. Run 'sbx secret set --help' to see available services."
+
+  - id: secret-ls-full
+    when:
+      command: sbx secret ls
+      state: { secret.github: true }
+    then:
+      output:
+        - "SCOPE      TYPE      NAME        SECRET"
+        - "(global)   service   anthropic   (stored)"
+        - "(global)   service   github      (stored)"
+
+  - id: secret-set-command
+    completes: store-secret
+    when:
+      command: sbx secret set
+      args:
+        0: { any: true }
+        --command: { any: true }
+    then:
+      state:
+        secret.github: true
+      output:
+        - "Verifying source…"
+        - { text: "Saved secret for service \"{{ args.0 }}\" in scope \"(global)\"", delay: short }
+        - "Source: command (refresh: 55m)"
+
+  - id: secret-set-interactive
+    when:
+      command: sbx secret set
+      args:
+        0: { any: true }
+    then:
+      state:
+        secret.github: true
+      input:
+        steps:
+          - key: value
+            prompt: "Enter secret: "
+            mask: true
+        then:
+          output:
+            - "Saved secret for service \"{{ args.0 }}\" in scope \"(global)\""
+
+  # --- Listing and ports ----------------------------------------------------
+
+  - id: sbx-ls-none
+    when:
+      command: sbx ls
+      state: { sandbox.created: false }
+    then:
+      output:
+        - "No sandboxes found."
+        - "Launch one: sbx run claude"
+
+  - id: sbx-ls-with-ports
+    when:
+      command: sbx ls
+      state: { ports.api: true }
+    then:
+      output:
+        - "SANDBOX        AGENT    STATUS    PORTS                       WORKSPACE"
+        - "sessionboard   claude   running   127.0.0.1:3000->3000/tcp4   /Users/you/code/sessionboard"
+
+  - id: sbx-ls
+    when:
+      command: sbx ls
+    then:
+      output:
+        - "SANDBOX        AGENT    STATUS    PORTS   WORKSPACE"
+        - "sessionboard   claude   running           /Users/you/code/sessionboard"
+
+  - id: ports-publish-api
+    completes: publish-port
+    when:
+      command: sbx ports
+      args:
+        --publish: "3000:3000"
+    then:
+      state:
+        ports.api: true
+      output:
+        - "Published 127.0.0.1:3000 -> 3000/tcp"
+
+  - id: ports-list-api
+    when:
+      command: sbx ports
+      state: { ports.api: true }
+    then:
+      output:
+        - "HOST IP     HOST PORT   SANDBOX PORT   PROTOCOL"
+        - "127.0.0.1   3000        3000           tcp"
+
+  - id: ports-list-empty
+    when:
+      command: sbx ports
+    then:
+      output:
+        - "No published ports"
+
+  # =========================================================================
+  # Section 2 — Customizing the sandbox with kits
+  # =========================================================================

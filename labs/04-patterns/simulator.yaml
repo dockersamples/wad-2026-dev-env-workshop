@@ -1,0 +1,145 @@
+version: "2.0"
+
+metadata:
+  id: patterns
+  title: "Patterns and what's next"
+  summary: "The full devcontainers-taken-seriously environment: clone inside, code-server in the browser, agent in the sandbox."
+
+# Picks up where module 3 left off: the environment was torn down with
+# `sbx env rm` so the new sbxenv.yaml can take effect on the next create.
+state:
+  env:
+    created: false
+  ports:
+    api: false
+    codeServer: false
+
+settings:
+  pace:
+    pull: 700
+    boot: 1100
+    install: 900
+
+defaults:
+  unmatched:
+    stderr:
+      - "That command isn't part of this module. Check the instructions on the left, or use Reset to start over."
+    exit: 127
+
+scenarios:
+  - id: sbx-version
+    when:
+      command: sbx version
+    then:
+      output:
+        - "sbx version: v0.45.0 9f2c41a7b0e5d38c6a1f4b2e7d905c8134ae6b22"
+
+  # `sbx run claude` is only useful in the Agent tab — it attaches you to the
+  # agent and that terminal is then busy for the rest of the lab.
+
+  - id: env-run-full
+    completes: full-env-up
+    when:
+      command: sbx env run
+      state: { env.created: false }
+    then:
+      state:
+        env.created: true
+        ports.api: true
+        ports.codeServer: true
+      output:
+        - "Environment: sessionboard-dev  (from ./sbxenv.yaml)"
+        - "Plan: 12 to add, 0 to change, 0 to destroy."
+        - "Apply these changes? [y/N] y"
+        - ""
+        - "── RESOLVE SETUP"
+        - "     sandbox    sessionboard-dev"
+        - "     agent      claude"
+        - "     workspace  (clone) /Users/you/code/sessionboard"
+        - "     kits       github-clone (mixin), sessionboard (mixin),"
+        - "                code-server (mixin), github-ssh (mixin), git-ssh-sign (mixin)"
+        - { text: "   ✓ configuration resolved", delay: short }
+        - "── APPLY KITS"
+        - { text: "   → github-clone: cloning wearedevelopers/sessionboard into /home/agent/workspace", delay: install }
+        - { text: "   → sessionboard: install (2 commands)", delay: install }
+        - { text: "   → code-server: install (2 commands)", delay: install }
+        - { text: "   → github-ssh: install (1 command)", delay: short }
+        - { text: "   → git-ssh-sign: install (1 command)", delay: short }
+        - "   ✓ kits applied"
+        - "── CREATE SANDBOX"
+        - { text: "   ✓ Created sandbox sessionboard-dev", delay: boot }
+        - "── STARTUP"
+        - { text: "   → sessionboard: docker compose up -d (background)", delay: install }
+        - { text: "   → code-server: start-code-server.sh (background)", delay: short }
+        - "── PUBLISH PORTS"
+        - "   ✓ 127.0.0.1:3000 -> 3000/tcp4"
+        - "   ✓ 127.0.0.1:8080 -> 8080/tcp4"
+        - ""
+        - "code-server is at http://localhost:8080"
+
+  - id: ports-list-code-server
+    when:
+      command: sbx ports
+      state: { ports.codeServer: true }
+    then:
+      output:
+        - "HOST IP     HOST PORT   SANDBOX PORT   PROTOCOL"
+        - "127.0.0.1   3000        3000           tcp"
+        - "127.0.0.1   8080        8080           tcp"
+
+  - id: ports-list-empty
+    when:
+      command: sbx ports
+    then:
+      output:
+        - "No published ports"
+
+  # =========================================================================
+  # Section 2 — Customizing the sandbox with kits
+  # =========================================================================
+
+  - id: curl-healthz
+    completes: reach-the-app
+    when:
+      command: curl
+      state: { ports.api: true }
+    then:
+      output:
+        - "{\"status\":\"ok\"}"
+
+  - id: curl-no-port
+    when:
+      command: curl
+    then:
+      stderr:
+        - "curl: (7) Failed to connect to localhost port 3000 after 2 ms: Could not connect to server"
+      exit: 7
+
+  - id: sbx-ls-with-ports
+    when:
+      command: sbx ls
+      state: { ports.api: true }
+    then:
+      output:
+        - "SANDBOX        AGENT    STATUS    PORTS                       WORKSPACE"
+        - "sessionboard   claude   running   127.0.0.1:3000->3000/tcp4   /Users/you/code/sessionboard"
+
+  - id: sbx-ls
+    when:
+      command: sbx ls
+    then:
+      output:
+        - "SANDBOX        AGENT    STATUS    PORTS   WORKSPACE"
+        - "sessionboard   claude   running           /Users/you/code/sessionboard"
+
+  - id: sbx-rm
+    when:
+      command: sbx rm
+    then:
+      state:
+        sandbox.created: false
+        kit.added: false
+        ports.api: false
+      output:
+        - "Deleting sandbox sessionboard..."
+        - "Sandbox 'sessionboard' removed"

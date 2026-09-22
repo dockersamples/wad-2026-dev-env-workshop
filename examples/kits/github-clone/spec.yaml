@@ -1,0 +1,114 @@
+# Clones a GitHub repository into the sandbox at create time, so the host
+# shares no workspace at all. Adapted from Christian Dupuis' github-clone kit
+# (https://github.com/cdupuis/sbx-kits/tree/main/github-clone) and vendored
+# here so following along needs no change to `kit.allowedSources`.
+schemaVersion: "2"
+kind: mixin
+name: github-clone
+displayName: GitHub Clone
+description: Clones a GitHub repository into the sandbox at create time using gh with a proxy-managed GH_TOKEN.
+
+args:
+  repo:
+    required: true
+    description: Repository as `owner/name`, an https URL, or an SSH URL.
+    # RE2. Deliberately narrow: the value is interpolated into a shell command
+    # below, so anything that isn't a recognisable GitHub repo spec is refused
+    # before the clone runs.
+    pattern: '^(?:[A-Za-z0-9._-]+/[A-Za-z0-9._-]+(?:\.git)?|https://github\.com/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+(?:\.git)?|git@github\.com:[A-Za-z0-9._-]+/[A-Za-z0-9._-]+(?:\.git)?)$'
+  ref:
+    default: ""
+    description: Optional branch, tag, or commit to check out. Empty clones the default branch.
+    pattern: '^[A-Za-z0-9._/-]*$'
+  dir:
+    default: "/home/agent/workspace"
+    description: Absolute directory to clone into. Skipped if it already exists and is non-empty.
+    pattern: '^/[A-Za-z0-9._/-]+$'
+
+permissions:
+  network:
+    allow:
+      # gh + git runtime. Every inject domain below must also appear here.
+      - api.github.com
+      - github.com
+      - codeload.github.com
+
+credentials:
+  - service: github
+    description: Token used to clone, and for later gh/git operations.
+    apiKey:
+      name: GH_TOKEN
+      # The container's GH_TOKEN is a sentinel; the proxy substitutes the real
+      # value on the way out. Provide it on the host with
+      # `sbx secret set github --command 'gh auth token'`.
+      proxyManaged: true
+      inject:
+        - domain: api.github.com
+          header: Authorization
+          format: Bearer %s
+        - domain: github.com
+          header: Authorization
+          username: x-access-token
+          format: "%s"
+
+setup:
+  install:
+    # Root: prepare the destination and route git HTTPS auth through gh, so
+    # the agent's later `git push` works without extra plumbing.
+    - command: |
+        set -euo pipefail
+        DIR='${{ kit.args.dir }}'
+
+        git config --system --unset-all credential."https://github.com".helper 2>/dev/null || true
+        git config --system --add       credential."https://github.com".helper ''
+        git config --system --add       credential."https://github.com".helper '!gh auth git-credential'
+
+        # Idempotent: leave an existing working tree alone.
+        if [ -d "$DIR" ] && [ -n "$(ls -A "$DIR" 2>/dev/null || true)" ]; then
+          exit 0
+        fi
+        mkdir -p "$DIR"
+        chown agent:agent "$DIR"
+      user: "0"
+      description: Prepare ${{ kit.args.dir }} and wire git credential helper
+
+    # Clone as the same uid that runs the agent, so the tree is agent-owned
+    # from the outset and git's dubious-ownership check never fires.
+    - command: |
+        set -euo pipefail
+        REPO='${{ kit.args.repo }}'
+        REF='${{ kit.args.ref }}'
+        DIR='${{ kit.args.dir }}'
+
+        if [ -d "$DIR" ] && [ -n "$(ls -A "$DIR" 2>/dev/null || true)" ]; then
+          echo "github-clone: '$DIR' already populated; skipping clone." >&2
+          exit 0
+        fi
+
+        if [ -n "$REF" ]; then
+          # --branch fails on a bare SHA, so fall back to a full clone.
+          if ! gh repo clone "$REPO" "$DIR" -- --depth 1 --branch "$REF" 2>/dev/null; then
+            find "$DIR" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+            gh repo clone "$REPO" "$DIR"
+            git -C "$DIR" checkout "$REF"
+          fi
+        else
+          gh repo clone "$REPO" "$DIR" -- --depth 1
+        fi
+      user: "1000"
+      description: Clone ${{ kit.args.repo }} into ${{ kit.args.dir }}
+
+agentInstructions:
+  content: |
+    ## github-clone
+
+    `${{ kit.args.repo }}` was cloned into `${{ kit.args.dir }}` when this
+    sandbox was created. Treat that directory as the working copy.
+
+    Authentication is proxy-mediated: `GH_TOKEN` inside the container is a
+    sentinel, and the sandbox proxy swaps in the real token bound on the host
+    when talking to `api.github.com` and `github.com`. `gh api`, `gh pr
+    create`, `git push`, and `git pull` all work without extra setup.
+
+    Nothing from the host is mounted here. Work that isn't pushed is lost
+    when the sandbox is removed.
