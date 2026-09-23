@@ -21,13 +21,6 @@ services:
       - "5173:5173"
     volumes:
       - ./labs:/usr/local/app/public/labs
-    # Bring pulse up alongside the preview so you get the FULL experience while
-    # authoring — live "who's here" presence, per-milestone counts, and the
-    # instructor insights dashboard. The app's bundled dev config already points
-    # at http://localhost:8888, so it just works; opt a single lab out with
-    # `tracking: false` in its labspace.yaml.
-    depends_on:
-      - pulse
 
   # One-shot validator: checks every lab under labs/ and regenerates labs.json.
   # Run with `docker compose run --rm validate`.
@@ -37,6 +30,3 @@ services:
     command: npm run validate-lab -- /labs
     volumes:
       - ./labs:/labs
-
-volumes:
-  pulse-data:

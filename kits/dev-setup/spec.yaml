@@ -5,16 +5,16 @@ version: v0.1.0
 displayName: Dev environment setup
 description: Configures and provides an automatic dev environment for the project.
 
-setup:
-  startup:
-    - command:
-        [
-          "docker",
-          "compose",
-          "up",
-          "-d",
-        ]
-      description: Start the compose stack for the project
+# setup:
+#   startup:
+#     - command:
+#         [
+#           "docker",
+#           "compose",
+#           "up",
+#           "-d",
+#         ]
+#       description: Start the compose stack for the project
 
 permissions:
   network:
