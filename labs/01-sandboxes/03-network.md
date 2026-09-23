@@ -1,8 +1,22 @@
-# The network is deny-by-default
+# The network boundary
 
-All outbound TCP leaves through a proxy on your host that checks every
-connection against a policy. UDP and ICMP are blocked outright and can't be
-unblocked.
+Every request that leaves your sandbox goes through a network proxy and
+policies are used to determine if the request should be allowed to proceed.
+
+There are three different default network policies you can choose for your
+sandboxes:
+
+- **Allow all (allow-all)** - all endpoints are available (not secure)
+- **Deny all (deny-all)** - all endpoints are denied (very locked down)
+- **Balanced (balanced)** - all endpoints are denied, except for a selection of 
+  developer-oriented endpoints
+
+Set the default policy by using the `sbx policy init` command. Run the following
+command to deny all endpoints:
+
+```bash terminal-id=host
+sbx policy init deny-all
+```
 
 Ask the agent to do some work. In the **Agent session** tab:
 
@@ -16,6 +30,13 @@ That's the boundary, working. Confirm it from **Your machine**:
 ```bash terminal-id=host
 sbx policy check network registry.npmjs.org
 ```
+
+> [!TIP]
+> Not all agents will understand they are being blocked by the sandbox. Having
+> a mention in your AGENTS.md to guide them is often helpful.
+>
+> _You are running in a sandbox. If you run into network blocks, stop and ask
+> for access, rather than trying to work around it._
 
 ## Change the boundary while the agent runs
 

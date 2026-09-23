@@ -30,7 +30,7 @@ each other, so the sandbox you start here is the one module 2 customizes.
 | 3 | An `sbxenv.yaml` that turns all of it into one command |
 | 4 | The full pattern: clone, code-server in the browser, agent inside |
 
-## About this terminal
+## About this lab environment
 
 Every command here is the real thing — same flags, same output. The terminal is
 scripted so that nobody needs an API key, a subscription, or a working network

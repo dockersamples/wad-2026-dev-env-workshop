@@ -20,9 +20,8 @@ permissions:
       - deb.debian.org
 
 ports:
-  - container: 3000
+  - sandbox: 3000
     protocol: tcp
-    name: api
 
 setup:
   install:
@@ -70,3 +69,47 @@ Check it:
 ```bash terminal-id=host
 sbx kit validate ./kits/sessionboard
 ```
+
+## Parameterize it
+
+That kit hardcodes `/home/agent/workspace`, which is fine until the second
+project wants it. A top-level `args:` block turns a hardcoded value into an
+input, referenced anywhere in the spec as `${{ kit.args.<name> }}`:
+
+```yaml no-run-button
+args:
+  dir:
+    default: "/home/agent/workspace"
+    description: Path to the project root inside the sandbox.
+    pattern: '^/[A-Za-z0-9._/-]+$'   # or `enum:`, or `required: true`
+
+setup:
+  install:
+    - command: npm ci --prefix '${{ kit.args.dir }}/api'
+      user: "1000"
+```
+
+Callers supply values with `--kit-arg`, or in `sbxenv.yaml` with the object
+form of a kit entry — which is what module 4's environment file is doing when
+it tells the clone kit which repo to fetch:
+
+```bash no-run-button
+sbx run claude --kit ./kits/sessionboard --kit-arg dir=/srv/app
+```
+
+```yaml no-run-button
+kits:
+  - source: ./kits/sessionboard
+    args:
+      dir: /srv/app
+```
+
+Values are validated *before* the sandbox is created, so a missing `required:`
+input or one that fails its `pattern` fails fast instead of halfway through an
+install command.
+
+> [!WARNING]
+> Never put a secret in a kit argument. Values are plain text — they stay in
+> your shell history and sit unencrypted in any args file. Credentials go
+> through `credentials:` and the host secret store, which is the whole point
+> of that machinery.

@@ -4,7 +4,8 @@ Put the last three modules together and you get an environment that has
 nothing to do with your local machine except a browser tab.
 
 1. A **github-clone** kit clones the repo inside the sandbox at create time,
-   using a proxy-managed `GH_TOKEN` — the real token stays on your host.
+   using a proxy-managed `GH_TOKEN` — the real token stays on your host. Which
+   repo and where it lands are kit `args`, passed in the `source:` form below.
 2. Your **project kit** installs tooling and starts the Compose stack.
 3. The **code-server** kit runs VS Code on port 8080, opened on the workspace,
    with the Claude Code extension already installed.

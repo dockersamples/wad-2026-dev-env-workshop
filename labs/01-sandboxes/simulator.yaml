@@ -47,7 +47,7 @@ scenarios:
       command: sbx version
     then:
       output:
-        - "sbx version: v0.45.0 9f2c41a7b0e5d38c6a1f4b2e7d905c8134ae6b22"
+        - "sbx version: v0.45.0 2f44e0511c4fa02d9a137d2702f90ce8284c7c14"
 
   # `sbx run claude` is only useful in the Agent tab — it attaches you to the
   # agent and that terminal is then busy for the rest of the lab.
@@ -93,10 +93,10 @@ scenarios:
         prompt: "› "
         intro:
           - ""
-          - "Claude Code is running inside the sandbox."
-          - "Ask it to work on SessionBoard. Type /exit to detach."
+          - "Your simulated agent is ready for work!"
+          - "Type /exit to detach."
         outro:
-          - "Detached from sessionboard. The sandbox keeps running — `sbx run --name sessionboard` reattaches."
+          - "Agent session closed."
 
   - id: sbx-run-reattach
     when:
@@ -110,7 +110,7 @@ scenarios:
         prompt: "› "
         intro:
           - ""
-          - "Claude Code is running inside the sandbox."
+          - "Your simulated agent is ready for work!"
           - "Type /exit to detach."
         outro:
           - "Detached from sessionboard."
@@ -154,6 +154,15 @@ scenarios:
         - " Name: sessionboard"
 
   # --- The live policy demo -------------------------------------------------
+
+  - id: host-set-default-policy
+    completes: set-default-policy
+    when:
+      command: sbx policy init deny-all
+      terminal: host
+    then:
+      output:
+        - "Global network policy initialized to \"deny-all\"."
 
   - id: agent-healthz-blocked
     completes: blocked-by-policy
@@ -267,7 +276,7 @@ scenarios:
       state:
         policy.npmAllowed: true
       output:
-        - "Rule added to policy local (scope: sandbox:sessionboard): 6262859e-c9f2-4595-9e11-3b2a42a0b3a5 (registry.npmjs.org)"
+        - "Rule added to policy local (scope: global): 6262859e-c9f2-4595-9e11-3b2a42a0b3a5 (registry.npmjs.org)"
 
   - id: policy-deny
     when:
@@ -276,7 +285,7 @@ scenarios:
       state:
         policy.npmAllowed: false
       output:
-        - "Rule added to policy local (scope: sandbox:sessionboard): 930f1ab3-7712-4ad9-913a-1d4d6a634cd9 (registry.npmjs.org)"
+        - "Rule added to policy local (scope: global): 930f1ab3-7712-4ad9-913a-1d4d6a634cd9 (registry.npmjs.org)"
 
   - id: policy-ls
     when:
@@ -334,9 +343,9 @@ scenarios:
       state:
         secret.github: true
       output:
-        - "Verifying source…"
-        - { text: "Saved secret for service \"{{ args.0 }}\" in scope \"(global)\"", delay: short }
-        - "Source: command (refresh: 55m)"
+        - "Verified: command resolved successfully."
+        - "Saved command secret for service \"github\" in scope \"(global)\""
+        - "Applied global secret to existing sandboxes"
 
   - id: secret-set-interactive
     when:
@@ -394,6 +403,19 @@ scenarios:
         ports.api: true
       output:
         - "Published 127.0.0.1:3000 -> 3000/tcp"
+
+  - id: ports-unpublish-api
+    completes: unpublish-port
+    when:
+      command: sbx ports
+      state: { ports.api: true }
+      args:
+        --unpublish: "3000:3000"
+    then:
+      state:
+        ports.api: false
+      output:
+        - "Unpublished 127.0.0.1:3000 -> 3000/tcp"
 
   - id: ports-list-api
     when:

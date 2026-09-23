@@ -55,25 +55,17 @@ scenarios:
       command: sbx kit inspect
     then:
       output:
-        - "Name:        code-server"
-        - "Kind:        mixin"
-        - "Schema:      v2"
-        - "Display:     code-server (web VS Code) with Claude Code"
-        - "Description: Runs code-server on port 8080, opened on the sandbox workspace, with the"
-        - "             Claude Code VS Code extension preinstalled."
-        - ""
-        - "Requires:"
-        - "  Agent:        claude"
-        - ""
+        - "Name:           code-server"
+        - "Kind:           mixin"
+        - "Schema:         v2"
+        - "Display:        code-server (web VS Code) with Claude Code"
+        - "Description:    Runs code-server on port 8080, opened on the sandbox workspace, with the Claude Code VS Code extension preinstalled. Pair with the built-in claude agent so the extension inherits the sandbox's Anthropic credentials."
+        - " " 
         - "Policies:"
         - "  Network:      8 allow, 0 deny"
-        - "  Credentials:  0 services"
-        - "  Ports:        1 (8080/tcp code-server)"
-        - ""
-        - "Setup:"
-        - "  Install:      2 commands"
-        - "  Startup:      1 command"
-        - "  Files:        1"
+        - "  Published:    1 ports"
+        - "  Commands:     2 install, 1 startup, 1 init files"
+        - "  Files:        1 home, 0 workspace"
 
   # The allowlist wall. Learners are meant to hit this before they fix it.
 
@@ -85,10 +77,9 @@ scenarios:
       state: { policy.kitSourcesWidened: false }
     then:
       stderr:
-        - "ERROR: resolve kits: kit \"{{ args.kit }}\" cannot be installed — its source is not in your allowlist."
-        - ""
-        - "Allowed sources: docker.io/"
-        - "Change with: sbx settings set kit.allowedSources '[\"docker.io/\", ...]'"
+        - "error: resolve kits: kit \"{{ args.kit }}\": kit \"{{ args.kit }}\" cannot be installed — its source is not in your allowlist; current kit.allowedSources: docker.io; allow this kit's publisher and re-run your original command; allowing any remote source is not recommended"
+        - "  try: sbx settings set kit.allowedSources '[\"docker.io/\"]'"
+        - "   or: sbx settings set kit.allowedSources '[\"*\"]'"
       exit: 1
 
   - id: settings-get-allowed-sources

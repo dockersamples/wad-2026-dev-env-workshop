@@ -29,24 +29,6 @@ services:
     depends_on:
       - pulse
 
-  # Presence + analytics backend (the same `pulse` service the platform deploys),
-  # published on :8888 where the app's dev config points. This is a DEV
-  # convenience only — in production you don't run pulse yourself; you set
-  # `pulse-endpoint` in .github/workflows/deploy.yml so the published site talks
-  # to your hosted backend. Delete this service (and the `depends_on` above) to
-  # author without any tracking.
-  pulse:
-    image: ${SIMSPACE_PULSE_IMAGE:-dockersamples/simspace-pulse:latest}
-    ports:
-      - "8888:8888"
-    environment:
-      # Enables the instructor dashboard at #/labs/<id>/insights — open it and
-      # enter this token. Any value works locally.
-      STATS_TOKEN: "dev-token"
-    volumes:
-      # Persist analytics across restarts. Remove for an ephemeral backend.
-      - pulse-data:/data
-
   # One-shot validator: checks every lab under labs/ and regenerates labs.json.
   # Run with `docker compose run --rm validate`.
   validate:

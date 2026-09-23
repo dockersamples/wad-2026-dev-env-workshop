@@ -91,6 +91,8 @@ sections:
   - title: The network boundary
     contentPath: 03-network.md
     steps:
+      - id: set-default-policy
+        title: "Set the default network policy to deny-all"
       - id: blocked-by-policy
         title: "Watch the network policy block the agent"
       - id: allow-domain
@@ -107,3 +109,5 @@ sections:
     steps:
       - id: publish-port
         title: "Publish a port to your browser"
+      - id: unpublish-port
+        title: "Stop forwarding the port"

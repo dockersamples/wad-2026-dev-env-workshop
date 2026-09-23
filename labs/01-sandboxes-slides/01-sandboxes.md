@@ -212,8 +212,8 @@ request. The sandbox sees a placeholder.
 ```console
 $ sbx secret set github \
     --command 'gh auth token'
-Saved secret for service "github"
-Source: command (refresh: 55m)
+Verified: command resolved successfully.
+Saved command secret for service "github" in scope "(global)"
 ```
 
 :::card{label="Three shapes"}
@@ -231,7 +231,7 @@ Changes take effect in running sandboxes immediately, same as policy.
 
 ---
 
-# Ports, briefly
+# Access sandbox services
 
 ```console
 $ sbx run --publish 8080:3000 --name sessionboard claude     # at creation
@@ -240,12 +240,8 @@ $ sbx ports sessionboard --publish 3000:3000                 # after the fact
 Published 127.0.0.1:3000 -> 3000/tcp
 ```
 
-:::fragment
-
 The catch that costs everyone twenty minutes once: the service must listen on
 `0.0.0.0`, not `127.0.0.1`. Most dev servers need `--host 0.0.0.0`.
-
-:::
 
 Note: Sandboxes are isolated in both directions. `host.docker.internal`
 reaches back the other way, and needs `sbx policy allow network

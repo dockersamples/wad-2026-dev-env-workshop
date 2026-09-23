@@ -49,11 +49,12 @@ built is good and none of it is shareable yet.
 :tag[Before]{accent=red}
 
 ```console
-$ sbx run claude . \
+$ sbx run \
     --kit ./kits/sessionboard \
     --kit docker.io/sbx/github-ssh-kit:latest \
     --publish 3000:3000 \
-    --name sessionboard-dev
+    --name sessionboard-dev \
+    claude
 ```
 
 …plus `sbx secret set`, plus the settings change, plus the bit you forgot.

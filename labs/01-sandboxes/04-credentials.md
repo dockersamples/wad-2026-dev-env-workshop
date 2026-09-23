@@ -21,13 +21,14 @@ sbx secret set github --command 'gh auth token'
 sbx secret ls
 ```
 
-Three shapes, all stored in your OS keychain:
+There are three different ways to configure secrets for your sandboxes. The right
+path is based on where the source material comes from.
 
 | Form | Use it for |
 | --- | --- |
-| `sbx secret set github` | A literal value, typed at the prompt |
-| `sbx secret set github --command 'gh auth token'` | A host tool that prints the token |
-| `sbx secret set anthropic --ref 'op://Work/Anthropic/credential'` | 1Password or AWS Secrets Manager |
+| `sbx secret set github` | A literal value either typed or passed in |
+| `sbx secret set github --command 'gh auth token'` | When the secret is produced by another tool |
+| `sbx secret set anthropic --ref 'op://Work/Anthropic/credential'` | When the secret is in another vault (for example 1Password or AWS Secrets Manager) |
 
 Adding or changing a secret takes effect in existing sandboxes immediately —
 no restart, just like policy.

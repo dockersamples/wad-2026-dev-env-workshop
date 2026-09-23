@@ -84,16 +84,6 @@ columns: 1 1
 
 <!-- region -->
 
-:tag[kind: mixin]{accent=blue}
-
-Extends an existing agent. Stack as many as you like.
-
-- Pre-install tools
-- Grant access to a service
-- Inject shared team config
-
-<!-- region -->
-
 :tag[kind: sandbox]{accent=amber}
 
 Defines a whole agent — image, entrypoint, everything.
@@ -101,6 +91,16 @@ Defines a whole agent — image, entrypoint, everything.
 - Package a custom agent
 - Ship a team-internal default
 - Run a fork of an existing one
+
+<!-- region -->
+
+:tag[kind: mixin]{accent=blue}
+
+Extends an existing agent. Stack as many as you like.
+
+- Pre-install tools
+- Grant access to a service
+- Inject shared team config
 
 Note: Mixins are 95% of what you'll write. Sandbox kits are how every built-in
 agent — claude, codex, copilot — is itself defined.
@@ -114,6 +114,7 @@ that at the end.
 
 | Block | Does |
 | --- | --- |
+| `args` | Inputs the kit takes — `${{ kit.args.x }}` |
 | `setup.install` | Commands run **once**, at creation |
 | `setup.startup` | Commands run at **every start** — must be idempotent |
 | `setup.files` | Files written at startup, runtime values substituted |
@@ -126,6 +127,11 @@ that at the end.
 Note: `install` vs `startup` is the distinction people get wrong.
 `docker compose up -d` is a startup command and is safe to run twice.
 `docker compose up` is not.
+
+`args` is worth ten seconds: a kit declares inputs, references them as
+`${{ kit.args.x }}`, and callers pass `--kit-arg name=value` (or an `args:`
+map in sbxenv.yaml). It's what turns a project kit into one several projects
+can share. Not for secrets — the values are plain text.
 
 ---
 

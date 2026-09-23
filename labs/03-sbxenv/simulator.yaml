@@ -58,21 +58,52 @@ scenarios:
       command: sbx env plan
     then:
       output:
-        - "Environment: sessionboard-dev  (from ./sbxenv.yaml)"
+        - "── LOAD ENVIRONMENT"
+        - "   reading environment file…"
+        - "     /path/to/project/sbxenv.yaml"
+        - "   ✓ environment loaded"
+        - "── ENVIRONMENT PLAN"
+        - "   sessionboard-dev"
         - ""
-        - "The following changes will be made OUTSIDE the sandbox:"
+        - "   kits:"
+        - "+    - source: /path/to/project/kits/sessionboard"
+        - "+    - source: docker.io/sbx/github-ssh-kit:latest"
         - ""
-        - "  + sandbox        sessionboard-dev (claude)"
-        - "  + workspace      /Users/you/code/sessionboard (rw)"
-        - "  + kit            ./kits/sessionboard"
-        - "  + kit            docker.io/sbx/github-ssh-kit:latest"
-        - "  + secret         github  ← command: gh auth token"
-        - "  + binding        github  apiKey → api.github.com, github.com"
-        - "  + mcp server     context7  https://mcp.context7.com/mcp"
-        - "  + port           3000 → 3000/tcp4"
+        - "   workspace:  (present, not recorded as applied, needs your approval)"
+        - "     path: /path/to/project"
         - ""
-        - "Plan: 8 to add, 0 to change, 0 to destroy."
-        - "Run `sbx env run` to apply."
+        - "+  sandbox:"
+        - "+    name: sessionboard-dev"
+        - "+    agent: claude"
+        - "+    sandboxOptions:"
+        - "+      memory: 8g"
+        - "+      cpus: 4"
+        - ""
+        - "   secrets:"
+        - "+    github:"
+        - "+      command: gh auth token"
+        - "+      workdir: /path/to/project"
+        - ""
+        - "   bindings:"
+        - "     github:  (present, not recorded as applied, needs your approval)"
+        - "       apiKey:"
+        - "         domains: api.github.com, github.com"
+        - ""
+        - "   mcp:"
+        - "     servers:"
+        - "+      - name: context7"
+        - "+        url: https://mcp.context7.com/mcp"
+        - ""
+        - "   ports:"
+        - "+    - sandbox: 3000"
+        - "+      protocol: tcp4"
+        - "+      host: 3000"
+        - ""
+        - "   Plan: + 6 to add, ~ 0 to change, - 0 to destroy."
+        - ""
+        - "   this plan runs commands on this machine, outside the sandbox, with your own privileges"
+        - "   ✓ not approved yet; applying asks once"
+        - ""
 
   - id: env-run-create
     completes: run-env
@@ -149,10 +180,6 @@ scenarios:
         - ""
         - "Test Suites: 1 passed, 1 total"
         - "Tests:       2 passed, 2 total"
-
-  # =========================================================================
-  # Section 4 — The full environment
-  # =========================================================================
 
   - id: env-rm
     completes: recreate-env

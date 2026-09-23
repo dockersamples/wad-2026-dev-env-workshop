@@ -17,6 +17,7 @@ directory, applied when the sandbox is created.
 
 | Block | What it does |
 | --- | --- |
+| `args` | Inputs the kit takes, so one kit serves several projects |
 | `setup.install` | Commands run **once**, at creation |
 | `setup.startup` | Commands run at **every start** — must be idempotent |
 | `setup.files` | Files written at startup, with runtime values substituted |

@@ -25,7 +25,7 @@ the walls stay up.
 Enough theory. In the **Agent session** tab:
 
 ```bash terminal-id=agent
-sbx run claude
+sbx run --name sessionboard claude
 ```
 
 That built a microVM, mounted your project directory into it, and attached you
